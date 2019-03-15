@@ -1,0 +1,3 @@
+http://alexco.ddns.net:81/alexandre/vss/src/master/software/Arduino
+
+http://alexco.ddns.net:81/alexandre/bcc-tg/src/master
