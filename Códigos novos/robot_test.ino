@@ -15,10 +15,10 @@
 
 #define TAM_BUFFER        16   // Buffer de SW para o rádio
 #define BASE_ADDRESS      00   // Base tem o endereço 0 (em octal)
-#define NETW_CHANNEL     100   // Canal padrão de operação do rádio
+#define netw_channel     100   // Canal padrão de operação do rádio
 
 #define MOTOR_CW           2   // Sentido horário:      10b
-#define MOTOR_CCW          1   // Sentido anti-horário: 01b 
+#define MOTOR_CCW          1   // Sentido anti-horário: 01b
 #define MOTOR_BRK_L        0   // Freio elétrico:       00b
 #define MOTOR_BRK_H        3   // Freio elétrico:       11b
 
@@ -55,14 +55,18 @@
 #define IRQ_RADIO   5      // Pino de interrupção do Rádio
 
 #define HBRID_EN    6      // Habilita a ponte H (High)
-#define MTR_AIN1   A3      // Bit 0 - Controle da ponte H do Motor A  <-- mudança com relação
-#define MTR_AIN2   A2      // Bit 1 - Controle da ponte H do Motor A  <-- ao código original
+#define MTR_AIN1   A3      // Bit 0 - Controle da ponte H do Motor A
+#define MTR_AIN2   A2      // Bit 1 - Controle da ponte H do Motor A
 #define MTR_BIN1   A1      // Bit 0 - Controle da ponte H do Motor B
 #define MTR_BIN2   A0      // Bit 1 - Controle da ponte H do Motor B
 #define MTR_PWMA    9      // Sinal de PWM para controle  do Motor A
 #define MTR_PWMB   10      // Sinal de PWM para controle  do Motor B
 
 #define VOLT_BAT   A7      // Tensão da bateria -> Vcc/10
+
+RF24 radio(RADIO_CE,RADIO_CS);
+
+byte addresses[][6]={"1Node", "2Node"};
 
 /* ******************************************************************* */
 /* Definições de estruturas de dados ( funcionais, status e controle ) */
@@ -116,32 +120,68 @@ void direcao_robo (int PWM, char direcao){
 }
 
 void setup (){
-    //Serial.begin(9600);
-    
-    pinMode(HBRID_EN, OUTPUT);          // Habilita ponte H
-    digitalWrite (HBRID_EN,HIGH);       // 
-    digitalWrite (LED,HIGH);       // 
 
-    
-    pinMode(MTR_AIN1, OUTPUT);          // Bit 0 - Controle da ponte H do Motor A
-    pinMode(MTR_AIN2, OUTPUT);          // Bit 1 - Controle da ponte H do Motor A
-    pinMode(MTR_BIN1, OUTPUT);          // Bit 0 - Controle da ponte H do Motor B
-    pinMode(MTR_BIN2, OUTPUT);          // Bit 1 - Controle da ponte H do Motor B
-    pinMode(MTR_PWMA, OUTPUT);          // Sinal de PWM para controle  do Motor A
-    pinMode(MTR_PWMB, OUTPUT);          // Sinal de PWM para controle  do Motor B
+  pinMode(HBRID_EN, OUTPUT);          // Habilita ponte H
+  digitalWrite (HBRID_EN,HIGH);       // 
+  digitalWrite (LED,LOW);       // 
+
+
+  pinMode(MTR_AIN1, OUTPUT);          // Bit 0 - Controle da ponte H do Motor A
+  pinMode(MTR_AIN2, OUTPUT);          // Bit 1 - Controle da ponte H do Motor A
+  pinMode(MTR_BIN1, OUTPUT);          // Bit 0 - Controle da ponte H do Motor B
+  pinMode(MTR_BIN2, OUTPUT);          // Bit 1 - Controle da ponte H do Motor B
+  pinMode(MTR_PWMA, OUTPUT);          // Sinal de PWM para controle  do Motor A
+  pinMode(MTR_PWMB, OUTPUT);          // Sinal de PWM para controle  do Motor B
+  
+  //Serial.begin(9600);
+  Serial.begin(SSPEED);
+  Serial.println("THIS IS THE RECEIVER CODE - YOU NEED THE OTHER ARDUINO TO TRANSMIT");
+
+  // Initiate the radio object
+  radio.begin();
+
+  // Set the transmit power to lowest available to prevent power supply related issues
+  radio.setPALevel(RF24_PA_MIN);
+
+  // Set the speed of the transmission to the quickest available
+  radio.setDataRate(RF24_2MBPS);
+
+  // Use a channel unlikely to be used by Wifi, Microwave ovens etc
+  radio.setChannel(netw_channel);
+
+  // Open a writing and reading pipe on each radio, with opposite addresses
+  radio.openWritingPipe(addresses[0]);
+  radio.openReadingPipe(1, addresses[1]);
+
+  // Start the radio listening for data
+  radio.startListening();
+
 }
 
-void loop (){
-     direcao_robo (50, 'w');
-     delay(1000);
-     direcao_robo (50, 'a');
-     delay(300);
-     direcao_robo (50, 's');
-     delay(1000);
-     direcao_robo (50, 'd');
-     delay(300);
-     direcao_robo (50, 't');
-     delay(1000);
-     
+void loop() {
+
+  // This is what we receive from the other device (the transmitter)
+  char data;
+
+  // Is there any data for us to get?
+  if ( radio.available()) {
+
+    // Go and read the data and put it into that variable
+    while (radio.available()) {
+      radio.read( &data, sizeof(char));
+    }
+
+    //radio.stopListening();
+    //radio.write( &data, sizeof(char) );
+    //radio.startListening();
+
+    //Serial.print("Sent response ");
+
+    Serial.println(data);
+  }
+  //data--;
+  
+  direcao_robo (70, data);
+  delay(300);
 
 }
