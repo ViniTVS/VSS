@@ -6,6 +6,7 @@ O objetivo inicial é de desenvolver um novo firmware baseado no anteriormente d
 ## Bibliotecas adicionais:
 ### Arduino:
 Tirando a biblioteca Motorino.h, todas as demais podem ser obtidas por meio do próprio menu do software do Arduino  (Sketch -> Incluir Biblioteca -> Gerenciar Bibliotecas).
+
 A instalação do Motorino.h e demais informações estão demonstradas no trabalho feito pelo Alexandre.
 
 #### Breve explicação destas bibliotecas:
@@ -22,9 +23,9 @@ Pode ser instalado com o seguinte comando:
 python -m pip install getch
 ```
 
-- [serial](https://pythonhosted.org/pyserial/)
+- [serial](https://pythonhosted.org/pyserial/):
 Utilizado para que ocorra a conexão via serial entre o programa Python e (no caso) a base tranmissora de dados.
 ```
 python -m pip install pyserial
 ```
-**Cuidado:** não instale a biblioteca 'serial' no lugar da 'pyserial'. O programa **não fuicionará** com esta outra biblioteca.
+**Cuidado: não** instale a biblioteca 'serial' no lugar da 'pyserial'. O programa **não fuicionará** com esta outra biblioteca.

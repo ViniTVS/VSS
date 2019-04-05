@@ -48,16 +48,13 @@ void setup() {
   digitalWrite(RADIO_PWR, HIGH);
 
   radio.begin();
-  radio.setPALevel(RF24_PA_MAX);  // deixar o alcance o máx. possível por... motivos
-  radio.setDataRate(RF24_2MBPS);  // vel. de transmissão
-  radio.setChannel(netw_channel);
+  radio.setPALevel(RF24_PA_MAX);        // deixar o alcance o máx. possível por... motivos
+  radio.setDataRate(RF24_2MBPS);        // vel. de transmissão
+  radio.setChannel(netw_channel);       // canal de transmissão
   // Abertura do canal de comunicação:
-  radio.openWritingPipe(canais[1]);
-  radio.openReadingPipe(1, canais[0]);
+  radio.openWritingPipe(canais[1]);     // transmito no canal 1 
+  radio.openReadingPipe(1, canais[0]);  // recebo do canal 0
 
-  // Set the transmit power to lowest available to prevent power supply related issues
-  // radio.setPALevel(RF24_PA_MIN);      //  
-  // Set the speed of the transmission
 }
 
 void loop() {
@@ -67,7 +64,7 @@ void loop() {
       data = Serial.read();
       final_time = millis();
   }
-  if (final_time - started_waiting_at > 2500 )      // se o usuário levar mais de 1,5 seg p/ mandar um novo dado, decido deixar o robô parado
+  if (final_time - started_waiting_at > 3000 )      // se o usuário demorar p/ mandar um dado, decido deixar o robô parado
     data = 'n';
 
   if (data == 'l')

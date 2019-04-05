@@ -152,23 +152,19 @@ void setup (){
   pinMode(MTR_BIN2, OUTPUT);          // Bit 1 - Controle da ponte H do Motor B
   pinMode(MTR_PWMA, OUTPUT);          // Sinal de PWM para controle  do Motor A
   pinMode(MTR_PWMB, OUTPUT);          // Sinal de PWM para controle  do Motor B
-  pinMode(LED     , OUTPUT);
-  digitalWrite(LED, LOW);
+  pinMode(LED     , OUTPUT);          // defino LED como output 
+  digitalWrite(LED, LOW);             // e o deixo apagado
 
-  //Serial.begin(9600);
+
   Serial.begin(SSPEED);
-  // Initiate the radio object
+
   radio.begin();
   radio.setPALevel(RF24_PA_MAX);
   radio.setDataRate(RF24_2MBPS);
   radio.setChannel(netw_channel);
-
-  // Open a writing and reading pipe on each radio, with opposite addresses
   radio.openWritingPipe(canais[0]);
   radio.openReadingPipe(1, canais[1]);
-
-  // Start the radio listening for data
-  radio.startListening();
+  radio.startListening();           // espero os dados
 
 }
 
