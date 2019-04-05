@@ -1,22 +1,12 @@
 #include <Motorino.h>
-#include <avr/pgmspace.h>
 #include <RF24Network.h>
 #include <RF24.h>
 #include <SPI.h>
 
-/****************** User Config ***************************/
-/***      Set this radio as radio number 0 or 1         ***/
-bool radioNumber = 0;
-
-/* Hardware configuration: Set up nRF24L01 radio on SPI bus plus pins 7 & 8 */
-/**********************************************************/
-
-byte addresses[][6] = {"1Node", "2Node"};
-
 // da base:
 
 #define SSPEED        115200   // Velocidade da interface serial
-#define SERIAL_ECHO        0   // Eco da msg recebida (Prod: 0 | Debug: 1) 
+#define SERIAL_ECHO        0   // Eco da msg recebida (Prod: 0 | Debug: 1)
 
 #define TAM_BUFFER        16   // Buffer de SW para o rádio
 #define BASE_ADDRESS      00   // Base tem o endereço 7 (em octal)
@@ -38,87 +28,92 @@ byte addresses[][6] = {"1Node", "2Node"};
 #define L3G                8   // Led 3 verde
 #define L3R                9   // Led 3 vermelho
 
-
 RF24 radio(RADIO_CE, RADIO_CS);  // Instância do rádio
-char data;
+
+
+// dados p/ o programa em si:
+char data, data_saida;
+char data_ant = 'n';
+byte canais[][1] = {"1Node", "2Node"}; // linha de conexão: [<valor de linhas(quantos canais)>][<valor de clounas(tam dos canais em byte)>]
+
 
 void setup() {
   Serial.begin(SSPEED);
+  Serial.println("Arduino transmissor ligado");
+
   pinMode(L1G, OUTPUT);
   digitalWrite (L1G, LOW);
-  Serial.println("Hi!, I am Arduino");
-  //Serial.println("THIS IS THE TRANSMITTER CODE - YOU NEED THE OTHER ARDIUNO TO SEND BACK A RESPONSE");
+  
   pinMode(RADIO_PWR, OUTPUT);
   digitalWrite(RADIO_PWR, HIGH);
-  // Initiate the radio object
+
   radio.begin();
+  radio.setPALevel(RF24_PA_MAX);  // deixar o alcance o máx. possível por... motivos
+  radio.setDataRate(RF24_2MBPS);  // vel. de transmissão
+  radio.setChannel(netw_channel);
+  // Abertura do canal de comunicação:
+  radio.openWritingPipe(canais[1]);
+  radio.openReadingPipe(1, canais[0]);
 
   // Set the transmit power to lowest available to prevent power supply related issues
-  radio.setPALevel(RF24_PA_MIN);
-
+  // radio.setPALevel(RF24_PA_MIN);      //  
   // Set the speed of the transmission
-  radio.setDataRate(RF24_2MBPS);
-
-  radio.setChannel(netw_channel);
-
-  // Open a writing and reading pipe on each radio, with opposite addresses
-  radio.openWritingPipe(addresses[1]);
-  radio.openReadingPipe(1, addresses[0]);
-
 }
 
 void loop() {
-  while (Serial.available()){
-    unsigned long started_waiting_at = millis();
-    if (millis() - started_waiting_at > 100 ) {
-      //Serial.println("No response received - timeout!");
-      data = 'n';
-      break;
-    }
-    else{
-    
-    data = Serial.read();
-    
-    if (data == 'l')
-      digitalWrite (L1G, HIGH);
-
-    else if (data == 'o')
-      digitalWrite (L1G, LOW);
-    }
+  unsigned long started_waiting_at = millis();
+  unsigned long final_time;
+  if (Serial.available()/* && (millis() - started_waiting_at < 100 )*/){
+      data = Serial.read();
+      final_time = millis();
   }
+  if (final_time - started_waiting_at > 2500 )      // se o usuário levar mais de 1,5 seg p/ mandar um novo dado, decido deixar o robô parado
+    data = 'n';
 
-  //char data = 'w';
-
-  // Ensure we have stopped listening 
-  radio.stopListening();
-
-  if (!radio.write( &data, sizeof(char) )) {
-    Serial.println("No acknowledgement of transmission - receiving radio device connected?");
-  }
+  if (data == 'l')
+    digitalWrite (L1G, HIGH);    // este é um teste simples: ligo o LED caso a entrada seja l
   
-  //radio.startListening();
-  //unsigned long started_waiting_at = millis();
+  /*
+  if (data == 'o')
+    digitalWrite (L1G, LOW);
+  */
 
-  // Loop here until we get indication that some data is ready for us to read (or we time out)
-  /*
-  while ( ! radio.available() ) {
-    if (millis() - started_waiting_at > 500 ) {
-      Serial.println("No response received - timeout!");
-      return;
-    }
+  //radio.stopListening();
+  /*                                  // teste de "solução" do prolema de transmição de dados***
+  if (data == 'n' && data_ant == 'n')
+    data_saida = 'n';
+  else
+    data_saida = data_ant;
+  data_ant = data;
+  */
+
+  if (!radio.write( &data, sizeof(char))) {
+    Serial.print("Transmissão ");
+    Serial.print(data);
+    Serial.println(" não enviada - conexão perdida");
+    //Serial.println (final_time);
+    
+    // caso não consiga enviar os dados, desligos os LEDs verdes e ligo os vermelhos
+    digitalWrite(L1R, HIGH);
+    digitalWrite(L2R, HIGH);
+    digitalWrite(L3R, HIGH);
+    digitalWrite(L1G, LOW);
+    digitalWrite(L2G, LOW);
+    digitalWrite(L3G, LOW);
   }
-   */
-  /*
-  char dataRx;
-  radio.read( &dataRx, sizeof(char) );
-  */
-  // Show user what we sent and what we got back
-  Serial.print("Sent: ");
-  Serial.println(data);
-  /*Serial.print(", received: ");
-  Serial.println(dataRx);
-  */
-  // Try again 0,1s later
-  delay(100);
-  //data = ' ';
+  //if(radio.write( &data_saida, sizeof(char))){
+  else{ 
+    Serial.print("Sent: ");     // aviso qual dado foi enviado
+    Serial.println(data);
+
+    // ligo os LEDs verdes 2 e 3 e desligo o resto
+    digitalWrite(L1G, LOW);
+    digitalWrite(L1R, LOW);
+    digitalWrite(L2R, LOW);
+    digitalWrite(L3R, LOW);
+    digitalWrite(L2G, HIGH);
+    digitalWrite(L3G, HIGH);
+    //Serial.print (final_time);
+  }
+  delay(5);
 }

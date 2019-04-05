@@ -1,5 +1,4 @@
 #include <Motorino.h>
-#include <avr/pgmspace.h>
 #include <RF24Network.h>
 #include <RF24.h>
 #include <SPI.h>
@@ -66,64 +65,85 @@
 
 RF24 radio(RADIO_CE,RADIO_CS);
 
-byte addresses[][6]={"1Node", "2Node"};
+// dados p/ o programa em si:
+char data;
+byte canais[][1] = {"1Node", "2Node"};
 
-/* ******************************************************************* */
-/* Definições de estruturas de dados ( funcionais, status e controle ) */
 
-void direcao_robo (int PWM, char direcao){
-    direcao = toupper(direcao);
-    analogWrite(MTR_PWMB, PWM);
+void direcao_robo (int PWM, char direcao){    
+
+    direcao = toupper(direcao); // padronizo a entrada em char maiúsculo
+    analogWrite(MTR_PWMB, PWM); // coloco vel. nas rodas
     analogWrite(MTR_PWMA, PWM);
 
-    
+// comandos W,A,S,D p/ direção (os padrões de jogos de computador)
     switch (direcao){
-        case 'W':
-            digitalWrite(MTR_BIN1, LOW );
-            digitalWrite(MTR_BIN2, HIGH);
-            digitalWrite(MTR_AIN1, LOW );
-            digitalWrite(MTR_AIN2, HIGH);
-            
-            break;
-        case 'S':
-            digitalWrite(MTR_BIN1, HIGH);
-            digitalWrite(MTR_BIN2, LOW );
-            digitalWrite(MTR_AIN1, HIGH);
-            digitalWrite(MTR_AIN2, LOW );
-            
-            break;
-        case 'D':
-            digitalWrite(MTR_BIN1, HIGH);
-            digitalWrite(MTR_BIN2, LOW );
-            digitalWrite(MTR_AIN1, LOW );
-            digitalWrite(MTR_AIN2, LOW );
-            
-            break;
-        case 'A':
-            digitalWrite(MTR_BIN1, LOW );
-            digitalWrite(MTR_BIN2, LOW );
-            digitalWrite(MTR_AIN1, LOW );
-            digitalWrite(MTR_AIN2, HIGH);
+      // todos seguem um padrão:
+      case 'W':                   
+        digitalWrite(LED, HIGH);      // ligo o LED do robô caso seja um movimento W,A,S,D
+        digitalWrite(MTR_BIN1, LOW ); // e arrumo as conexões das pontes H 
+        digitalWrite(MTR_BIN2, HIGH);
+        digitalWrite(MTR_AIN1, LOW );
+        digitalWrite(MTR_AIN2, HIGH);
 
-            break;            
-        default:
-            digitalWrite(MTR_BIN1, HIGH);
-            digitalWrite(MTR_BIN2, HIGH);
-            digitalWrite(MTR_AIN1, HIGH);
-            digitalWrite(MTR_AIN2, HIGH);
-            
-            digitalWrite(MOTOR_BRK_H, HIGH);
-            digitalWrite(MOTOR_BRK_L, LOW);
-            
-            break;
-       }// o resto é comando via rádio 
+        break;
+      case 'S':
+        digitalWrite(LED, HIGH);
+        digitalWrite(MTR_BIN1, HIGH);
+        digitalWrite(MTR_BIN2, LOW );
+        digitalWrite(MTR_AIN1, HIGH);
+        digitalWrite(MTR_AIN2, LOW );
+
+        break;
+      case 'D':
+        digitalWrite(LED, HIGH);
+        digitalWrite(MTR_BIN1, LOW);
+        digitalWrite(MTR_BIN2, HIGH);
+        digitalWrite(MTR_AIN1, LOW );
+        digitalWrite(MTR_AIN2, LOW );
+
+        break;
+      case 'A':
+        digitalWrite(LED, HIGH);
+        digitalWrite(MTR_BIN1, LOW );
+        digitalWrite(MTR_BIN2, LOW );
+        digitalWrite(MTR_AIN1, LOW );
+        digitalWrite(MTR_AIN2, HIGH);
+
+        break;    
+      /*        ainda sendo feito
+      case 'N':
+        digitalWrite(MTR_BIN1, LOW);
+        digitalWrite(MTR_BIN2, LOW);
+        digitalWrite(MTR_AIN1, LOW);
+        digitalWrite(MTR_AIN2, LOW);
+
+        digitalWrite(MOTOR_BRK_H, LOW);
+        digitalWrite(MOTOR_BRK_L, LOW);
+          
+        break;
+      */     
+      default:                      // freio elétrico
+        digitalWrite(LED, LOW);     // LED fica desligado
+        digitalWrite(MTR_BIN1, HIGH);
+        digitalWrite(MTR_BIN2, HIGH);
+        digitalWrite(MTR_AIN1, HIGH);
+        digitalWrite(MTR_AIN2, HIGH);
+
+        digitalWrite(MOTOR_BRK_H, HIGH);
+        digitalWrite(MOTOR_BRK_L, LOW);
+
+        break;          
+       }
+       delay(50); // tempo p/ que o robô se mova como pedido
+
 }
 
 void setup (){
 
   pinMode(HBRID_EN, OUTPUT);          // Habilita ponte H
-  digitalWrite (HBRID_EN,HIGH);       // 
-  digitalWrite (LED,LOW);       // 
+  digitalWrite (HBRID_EN,HIGH);       //
+  digitalWrite (LED,LOW);             //
 
 
   pinMode(MTR_AIN1, OUTPUT);          // Bit 0 - Controle da ponte H do Motor A
@@ -132,26 +152,20 @@ void setup (){
   pinMode(MTR_BIN2, OUTPUT);          // Bit 1 - Controle da ponte H do Motor B
   pinMode(MTR_PWMA, OUTPUT);          // Sinal de PWM para controle  do Motor A
   pinMode(MTR_PWMB, OUTPUT);          // Sinal de PWM para controle  do Motor B
-  
+  pinMode(LED     , OUTPUT);
+  digitalWrite(LED, LOW);
+
   //Serial.begin(9600);
   Serial.begin(SSPEED);
-  Serial.println("THIS IS THE RECEIVER CODE - YOU NEED THE OTHER ARDUINO TO TRANSMIT");
-
   // Initiate the radio object
   radio.begin();
-
-  // Set the transmit power to lowest available to prevent power supply related issues
-  radio.setPALevel(RF24_PA_MIN);
-
-  // Set the speed of the transmission to the quickest available
+  radio.setPALevel(RF24_PA_MAX);
   radio.setDataRate(RF24_2MBPS);
-
-  // Use a channel unlikely to be used by Wifi, Microwave ovens etc
   radio.setChannel(netw_channel);
 
   // Open a writing and reading pipe on each radio, with opposite addresses
-  radio.openWritingPipe(addresses[0]);
-  radio.openReadingPipe(1, addresses[1]);
+  radio.openWritingPipe(canais[0]);
+  radio.openReadingPipe(1, canais[1]);
 
   // Start the radio listening for data
   radio.startListening();
@@ -160,28 +174,13 @@ void setup (){
 
 void loop() {
 
-  // This is what we receive from the other device (the transmitter)
-  char data;
-
-  // Is there any data for us to get?
+//while (radio.available()) {
   if ( radio.available()) {
-
-    // Go and read the data and put it into that variable
-    while (radio.available()) {
-      radio.read( &data, sizeof(char));
-    }
-
-    //radio.stopListening();
-    //radio.write( &data, sizeof(char) );
-    //radio.startListening();
-
-    //Serial.print("Sent response ");
-
-    Serial.println(data);
-  }
-  //data--;
+    radio.read( &data, sizeof(char));
+    //Serial.print("Comando recebido: ");
+    //Serial.println(data);
   
-  direcao_robo (70, data);
-  delay(300);
+  }
 
+  direcao_robo (100, data);
 }
