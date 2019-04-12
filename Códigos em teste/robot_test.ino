@@ -70,17 +70,22 @@ char data = 'n';
 const byte canais[2] = {0xF0, 0xFF}; 
 int enc_a, enc_b;
 int v_enc_a = 0;
-int vel = 150;
-bool move = false;
+int vel = 100;
+//bool move = false;
 
-void teste_enc (int enc,int furos){
+
+//  teste p/ que o robo ande de acordo com quantos graus sejam desejados
+void teste_enc (int enc, int graus){    // entrada: encoder que será usado e o tanto de graus a serem "andados" 
+  // andar todos os 24 furos é o mesmo que virar em 90º, então:
+  int andar = WHEEL_TICKS*graus/90;
+  
   int anterior = 0;
-  int atual = 1;
+  int atual;
   int andado = 0;
   int erro = furos / 20;
   while(true){
     atual = digitalRead(enc);
-    if (atual == LOW && anterior == HIGH)
+    if (atual == LOW && anterior == HIGH)   // vejo se a roda realmente andou ou se 
       andado++;
 
     else{
@@ -90,13 +95,13 @@ void teste_enc (int enc,int furos){
     }
     anterior = atual;
 
-    if (andado == furos - erro)
+    if (andado == andar - erro)
       break;
   }
   Serial.print(andado);
 }
 
-bool direcao_robo (int PWM, char direcao){    
+void direcao_robo (int PWM, char direcao){    
 
     direcao = toupper(direcao); // padronizo a entrada em char maiúsculo
     analogWrite(MTR_PWMB, PWM); // coloco vel. nas rodas
@@ -112,9 +117,9 @@ bool direcao_robo (int PWM, char direcao){
         digitalWrite(MTR_AIN1, LOW );
         digitalWrite(MTR_AIN2, HIGH);
 
-        delay(50);
-        return true;
-        //break;
+        //delay(50);
+        //return true;
+        break;
       case 'S':
         digitalWrite(LED, HIGH);
         digitalWrite(MTR_BIN1, HIGH);
@@ -139,10 +144,30 @@ bool direcao_robo (int PWM, char direcao){
         digitalWrite(MTR_BIN2, LOW );
         digitalWrite(MTR_AIN1, LOW );
         digitalWrite(MTR_AIN2, HIGH);
-        teste_enc (IRQ_ENC_A, 24);
+        //teste_enc (IRQ_ENC_A, 24);
         //delay(10);
         //return true;
-        break;    
+        break;
+      case 'Q':
+        digitalWrite(LED, HIGH);
+        digitalWrite(MTR_BIN1, LOW );
+        digitalWrite(MTR_BIN2, LOW );
+        digitalWrite(MTR_AIN1, LOW );
+        digitalWrite(MTR_AIN2, HIGH);
+        
+        teste_enc (IRQ_ENC_A, 24);
+        
+        break; 
+      case 'E':
+        digitalWrite(LED, HIGH);
+        digitalWrite(MTR_BIN1, LOW);
+        digitalWrite(MTR_BIN2, HIGH);
+        digitalWrite(MTR_AIN1, LOW );
+        digitalWrite(MTR_AIN2, LOW );
+
+        teste_enc (IRQ_ENC_B, 24);
+
+        break;
       /*        ainda sendo feito
       case 'N':
         digitalWrite(MTR_BIN1, LOW);
@@ -165,11 +190,11 @@ bool direcao_robo (int PWM, char direcao){
         digitalWrite(MOTOR_BRK_H, HIGH);
         digitalWrite(MOTOR_BRK_L, LOW);
 
-        return false;
+        //return false;
         break;          
       }
       delay(50); // tempo p/ que o robô se mova como pedido
-      return true;
+      //return true;
 }
 
 void setup (){
@@ -223,20 +248,7 @@ void loop() {
     //Serial.println(&data);
   
   }
-//Serial.println(data);
-  //if (v_enc_a < 24)
-    move = direcao_robo (vel, 'a');
-    direcao_robo(0, 'w');
-    delay(5000);
-    move = direcao_robo (vel, 'd');
-    direcao_robo(0, 'w');
-    delay(5000);
 
-  /*else
-  { 
-    direcao_robo (0, 'n');
-    move = false;
-    delay (500);
-    v_enc_a = 0;
-  }*/
+  direcao_robo (vel, data);
+
 }

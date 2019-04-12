@@ -24,7 +24,7 @@ python -m pip install getch
 ```
 
 - [serial](https://pythonhosted.org/pyserial/):
-Utilizado para que ocorra a conexão via serial entre o programa Python e (no caso) a base tranmissora de dados.
+Utilizado para que ocorra a conexão via serial entre o programa Python e (no caso) a base transmissora de dados.
 ```
 python -m pip install pyserial
 ```

@@ -19,7 +19,7 @@ while True:
 	entrada = getch.getch();	# pega chars como entrada sem a necesidade de teclar enter
 
 	ArduinoSerial.write(entrada)
-	print ("A entrada foi:"),entrada
+	#print ("A entrada foi:"),entrada
 
 	if entrada == 'p' or entrada == 'P':		# critério p/ sair do loop
 		break
