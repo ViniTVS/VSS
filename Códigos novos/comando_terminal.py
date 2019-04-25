@@ -1,5 +1,5 @@
 # -*- coding: UTF-8 -*-
-import getch
+from getch import getch
 import serial
 from serial import Serial
 

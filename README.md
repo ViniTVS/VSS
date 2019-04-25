@@ -20,7 +20,7 @@ Todas as bibliotecas são instaladas com o uso do pip, que normalmente já vem i
 Basimente usado para a função de para pegar o input do usuário sem a necessidade de teclar o enter.
 Pode ser instalado com o seguinte comando:
 ```
-python -m pip install getch
+python -m pip install py-getch
 ```
 
 - [serial](https://pythonhosted.org/pyserial/):
