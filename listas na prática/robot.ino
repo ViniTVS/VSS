@@ -73,200 +73,254 @@ typedef union {
                  ponte_B : 2,
                  angulo  : 9,                
                  not_used: 2,
-				 ponte 	 : 1;
+         ponte   : 1; // bits mais significativos
     };
     uint32_t hexa = 0x00000000;   // sempre que declarar uma variável controle, ela iniciará com seus valores zerados
-} controle;
+} mensagem;
 
 
 //  ----------------------- declaração de variáveis globais -----------------------------------
+RF24 radio(RADIO_CE,RADIO_CS);
 
 uint32_t  blinker = 0;
 uint32_t  timer = 0;
-uint8_t   endereco;
-controle mensagem;
+//byte   endereco;
+mensagem comando;
 bool locked;
 int enc_a_val = 0, enc_b_val = 0;
 
 
 // --------------------------- declaração de funções e afins --------------------------------
 
-uint8_t end_radio (){
-	uint8_t addr = 0x00;
-	//bool aux = !digitalRead(RADIO_A0);
-	addr = addr | !digitalRead(RADIO_A1);
-	addr = addr << 1;
-	addr = addr | !digitalRead(RADIO_A0); 
+byte end_radio (){  // cálculo do enderço do robô dos pinos físicos para o endereço na variável
+  byte addr = 0x00;
+  addr = addr | !digitalRead(RADIO_A1);
+  addr = addr << 1;
+  addr = addr | !digitalRead(RADIO_A0); 
 
-	Serial.print("Endereço do robô: ");
-	Serial.println(addr);
+  Serial.print("Endereço do robô: ");
+  Serial.println(addr);
 
-	return addr;
+  return addr;
 }
 
-void tasks(int tempo){
-	if( (millis() - (timer - 1)) > tempo){
-		timer = millis();
-		blinker++; 
-		digitalWrite(LED, bitRead(blinker, 0));
-		Serial.print(timer);
-		Serial.print(" de ");  
-		Serial.print(blinker); 
+void tasks(int tempo){    // função de teste p/ fazer um escalonador
+  // faço a checagem p/ ver se executo este escalonador
+  if( (millis() - (timer - 1)) > tempo){
+    // caso sim, atualizo o valor da var. timer
+    timer = millis();
+    blinker++;
+    // escrevo o bit menos significativo de blinke no LED
+    // se o nº for par, seu último bit é zero, caso ímpar, o bit é 1
+    // então, sempre que blinker for par, o LED se apaga 
+    digitalWrite(LED, bitRead(blinker, 0));
+    Serial.print(timer);
+    Serial.print(" de ");  
+    Serial.print(blinker); 
 
-		if (bitRead(blinker, 0) == 0)
-			Serial.println(" - LED desligado ");
-		else
-			Serial.println(" - LED ligado ");
+    if (bitRead(blinker, 0) == 0)
+      Serial.println(" - LED desligado ");
+    else
+      Serial.println(" - LED ligado ");
 
-		//acelero mais o robô para testar diferentes velocidades
-		mensagem.hexa= mensagem.hexa + 10;
-	}
+    //acelero mais o robô para testar diferentes velocidades
+    // comando.hexa= comando.hexa + 10;
+  }
 }
-
-void enc_check_a (){
-	enc_a_val++;
-	Serial.print("\nValor do enc A: ");
-	Serial.println(enc_a_val);
+//como interrupts não deixa passar parâmetros, ambos enc_check fazem o mesmo
+void enc_check_a (){  // cada vez que tenho uma interrupção de borda descendo do enc, 
+            // aumento o valor de suas variáveis
+  enc_a_val++;
+  Serial.print("\nValor do enc A: ");
+  Serial.println(enc_a_val);
 }
 
 void enc_check_b (){
-	enc_b_val++;
-	Serial.print("\nValor do enc B: ");
-	Serial.println(enc_b_val);
+  enc_b_val++;
+  Serial.print("\nValor do enc B: ");
+  Serial.println(enc_b_val);
 }
 
-void set_motor_status (controle entrada){
-	// int furos = 20;
-	// habilito as pontes H
-	digitalWrite (HBRID_EN,HIGH);
-	
-	// arrumo as pontes H com os dados da entrada
-	digitalWrite(MTR_BIN1, bitRead(entrada.ponte_B, 0));
-	digitalWrite(MTR_BIN2, bitRead(entrada.ponte_B, 1));
+void set_motor_status (mensagem entrada){ // defino o direcionamento do robô e sua vel.
+  // arrumo as pontes H com os dados da entrada
+  digitalWrite(MTR_BIN1, bitRead(entrada.ponte_B, 0));
+  digitalWrite(MTR_BIN2, bitRead(entrada.ponte_B, 1));
 
-	digitalWrite(MTR_AIN1, bitRead(entrada.ponte_A, 0));
-	digitalWrite(MTR_AIN2, bitRead(entrada.ponte_A, 1));
-	
-	// ajusto as velocidades caso sejam acima ou abaixo do esperado      
-	if (entrada.pwm_A < PWM_MIN)
-			entrada.pwm_A = PWM_MIN;
-	if (entrada.pwm_A > PWM_MAX)
-			entrada.pwm_A = PWM_MAX;
-	analogWrite(MTR_PWMA, entrada.pwm_A);
+  digitalWrite(MTR_AIN1, bitRead(entrada.ponte_A, 0));
+  digitalWrite(MTR_AIN2, bitRead(entrada.ponte_A, 1));
+  
+  // ajusto as velocidades caso sejam acima ou abaixo do esperado      
+  if (entrada.pwm_A < PWM_MIN)
+      entrada.pwm_A = PWM_MIN;
+  if (entrada.pwm_A > PWM_MAX)
+      entrada.pwm_A = PWM_MAX;
+  analogWrite(MTR_PWMA, entrada.pwm_A);
 
-	if (entrada.pwm_B < PWM_MIN)
-			entrada.pwm_B = PWM_MIN;
-	if (entrada.pwm_B > PWM_MAX)
-			entrada.pwm_B = PWM_MAX;
-	analogWrite(MTR_PWMB, entrada.pwm_B);
+  if (entrada.pwm_B < PWM_MIN)
+      entrada.pwm_B = PWM_MIN;
+  if (entrada.pwm_B > PWM_MAX)
+      entrada.pwm_B = PWM_MAX;
+  analogWrite(MTR_PWMB, entrada.pwm_B);
 
-	// para calcular o número de furos necessários para andar,
-	// faço uma "regra de 3" e arredondo o valor 
-	// andar todos os 24 furos é o mesmo que virar em 90º, então:
-	float furos = (WHEEL_TICKS * entrada.angulo)/90.0;
-	furos = round (furos);
-	
-	// zero os contadores dos encoders
-	enc_a_val =	0; enc_b_val = 0;
+  // para calcular o número de furos necessários para andar,
+  // faço uma "regra de 3" e arredondo o valor 
 
-	// faço a contagem de quantos furos precisam ser contados  
-	while (!is_motor_locked(entrada)){
-	  	attachInterrupt(digitalPinToInterrupt(IRQ_ENC_A), enc_check_a, FALLING);  //altera o valor quando  
-		attachInterrupt(digitalPinToInterrupt(IRQ_ENC_B), enc_check_b, FALLING);
+  // como andar todos os 24 furos é o mesmo que virar em 90º, então:
+  float furos;
+  if (entrada.pwm_B != entrada.pwm_A){
+    furos = (WHEEL_TICKS * entrada.angulo)/90.0;
+    furos = round (furos);
+  }
+  else
+    furos = 5;
+  
+  // zero os contadores dos encoders
+  enc_a_val = 0; enc_b_val = 0;
 
-		if ((enc_a_val >= furos) || (enc_b_val >= furos)){
-			digitalWrite (HBRID_EN,LOW);
-			// Serial.println("\n\nPAREI \n");
-			delay(20000);
-			break;
-		}
-	}
+  // habilito as pontes H
+  digitalWrite (HBRID_EN,entrada.ponte);
+
+  while (!is_motor_locked(entrada)){  // se o motor não estiver travado...
+    // faço a contagem nas var. dos encoders, alterando o valor na borda de descida dos encoders
+    // (quando "passo" o pino, o contabilizo)
+      attachInterrupt(digitalPinToInterrupt(IRQ_ENC_A), enc_check_a, FALLING);    
+    attachInterrupt(digitalPinToInterrupt(IRQ_ENC_B), enc_check_b, FALLING);
+
+    if ((enc_a_val == furos) || (enc_b_val == furos)){  // quando andados os furos necessários,desligo a ponte H
+//      digitalWrite (HBRID_EN,LOW);
+      delay(50);
+      break;
+    }
+  }
 }
 
-bool is_motor_locked(controle entrada){		// retorna 1 se o motor estiver travado
-	bool testeA, testeB, testeF;
-	testeA = bitRead(entrada.ponte_A, 0) ^ bitRead(entrada.ponte_A, 1);	// faço o xor dos bits de ambas as pontes
-	testeB = bitRead(entrada.ponte_B, 0) ^ bitRead(entrada.ponte_B, 1);	// já que 00 e 11 são freio elétrico
-	testeF = (testeA || testeB) & digitalRead(HBRID_EN);	// se qualquer ponte estiver ligada e se o enable da ponte está ligado
-	//Serial.println(testeF);
-	if (!testeF == 1)
-		Serial.println("AVISO: MOTOR TRAVADO (freio elétrico)");
-	return !testeF;
+bool is_motor_locked(mensagem entrada){   // retorna 1 se o motor estiver travado
+  bool testeA, testeB, testeF;
 
+  testeA = bitRead(entrada.ponte_A, 0) ^ bitRead(entrada.ponte_A, 1); // faço o xor dos bits de ambas as pontes
+  testeB = bitRead(entrada.ponte_B, 0) ^ bitRead(entrada.ponte_B, 1); // já que 00 e 11 são freio elétrico
+  testeF = testeA | testeB;
+//  testeF = testeF & digitalRead(HBRID_EN);  // se qualquer ponte estiver ligada e se o enable da ponte está ligado
+  
+  // no final, testeF será 1 caso esteja andando
+  if (testeF == 0)
+    Serial.println("AVISO: MOTOR TRAVADO (freio elétrico)");
+
+  return !testeF; // como quero saber se o robo está parado, retorno o contrário
 }
 
 // uint32_t get_motor_status( void );
 
-void get_motor_status (controle entrada){
-	if (is_motor_locked(entrada))
-		return;
-	if (digitalRead(HBRID_EN) == 0){
-		Serial.println("O robô está na banguela");
-		return;
-	}
+void get_motor_status (mensagem entrada){
+  if (digitalRead(HBRID_EN) == 0){  // ponte H desativada
+    Serial.println("O robô está na banguela");  
+    return;
+  }
 
-		
+  if (is_motor_locked(entrada))
+    return;
+  else{
+    Serial.println("O robô está em movimento");
+//    delay(500);
+    return;
+  }
 }
 
 
 // --------------------------- setup e loop do arduino ----------------------------------------
+
+byte endereco = end_radio ();      // carrego o valor do end. robo
+const byte canais[2] = {0x00, 0xFF}; 
+
 void setup (){
 
-    Serial.begin(115200);
+    Serial.begin(SSPEED);
 
-    pinMode(LED, OUTPUT);
-    digitalWrite(LED, LOW);
-    pinMode(IRQ_ENC_A, INPUT_PULLUP);
+    pinMode(LED     , OUTPUT);          // defino LED como output 
+    digitalWrite(LED, LOW);             // e o deixo apagado    
+
+    pinMode(IRQ_ENC_A, INPUT_PULLUP); 
     pinMode(IRQ_ENC_B, INPUT_PULLUP);
     pinMode(RADIO_A0 , INPUT_PULLUP);    // Endereço deste nó: bit 0
     pinMode(RADIO_A1 , INPUT_PULLUP);    // Endereço deste nó: bit 1
-    endereco = end_radio ();
 
-    pinMode(HBRID_EN, OUTPUT);          // Habilita ponte H
-    digitalWrite (HBRID_EN,LOW);       //
-    digitalWrite (LED,LOW);             //
-
-
+    // Habilito as saidas de controle da ponte H
+    pinMode(HBRID_EN, OUTPUT);          // Habilita o pino da ponte H
+    digitalWrite (HBRID_EN,LOW);    // e a deixo desativada
     pinMode(MTR_AIN1, OUTPUT);          // Bit 0 - Controle da ponte H do Motor A
     pinMode(MTR_AIN2, OUTPUT);          // Bit 1 - Controle da ponte H do Motor A
     pinMode(MTR_BIN1, OUTPUT);          // Bit 0 - Controle da ponte H do Motor B
     pinMode(MTR_BIN2, OUTPUT);          // Bit 1 - Controle da ponte H do Motor B
     pinMode(MTR_PWMA, OUTPUT);          // Sinal de PWM para controle  do Motor A
     pinMode(MTR_PWMB, OUTPUT);          // Sinal de PWM para controle  do Motor B
-    pinMode(LED     , OUTPUT);          // defino LED como output 
-    digitalWrite(LED, LOW);             // e o deixo apagado
 
+    //inicialização do rádio e
+    radio.begin();
+    radio.setPALevel(RF24_PA_MAX);
+    radio.setDataRate(RF24_2MBPS);
+    radio.setChannel(netw_channel);
+    radio.openWritingPipe(canais[0]);
+    radio.openReadingPipe(1, canais[1]);
+    radio.startListening(); 
 
-    //Serial.begin(SSPEED);
-    
-    mensagem.hexa = 0x167A3232;
-	Serial.println("Valor de pwm_A:");
-    Serial.println(mensagem.pwm_A);	
-	Serial.println("Valor de pwm_B:");
-    Serial.println(mensagem.pwm_B);
-	Serial.println("Valor de ponte_B:");
-    Serial.println(mensagem.ponte_B);
-	Serial.println("Valor de ponte_A:");
-    Serial.println(mensagem.ponte_A);
-	Serial.println("Valor de angulo:");
-    Serial.println(mensagem.angulo);
-	Serial.println("Valor de not_used:");
-    Serial.println(mensagem.not_used);
+    // tudo teste:
+    // comando.hexa = 0x167A3232;
+    // comando.ponte = 1;
+    Serial.println("Valor de pwm_A:");
+    Serial.println(comando.pwm_A); 
+    Serial.println("Valor de pwm_B:");
+    Serial.println(comando.pwm_B);
+    Serial.println("Valor da ponte:");
+    Serial.println(comando.ponte);
+    Serial.println("Valor de ponte_B:");
+    Serial.println(comando.ponte_B);
+    Serial.println("Valor de ponte_A:");
+    Serial.println(comando.ponte_A);
+    Serial.println("Valor de angulo:");
+    Serial.println(comando.angulo);
+    Serial.println("Valor de not_used:");
+    Serial.println(comando.not_used);
 
-	Serial.println("Motor locked:");
-	locked = is_motor_locked(mensagem);
-    Serial.println(locked);
+    // Serial.println("Motor locked:");
+    // locked = is_motor_locked(comando);
+    // Serial.println(locked);
 
-	// task_dir(0,mensagem);
+    // task_dir(0,mensagem);
 
 }
 
 void loop() {
-  	tasks(1000);                // Tarefas executadas a cada 1s
+    // tasks(1000);                // Tarefas executadas a cada 1s
+    if ( radio.available()) {
+        radio.read( &comando.hexa, sizeof(mensagem));
+        Serial.print("Mensagem recebida: ");
+        Serial.println(comando.hexa, BIN);
+        digitalWrite(LED, 1);
+        Serial.println("Valor de pwm_A:");
+        Serial.println(comando.pwm_A); 
+        Serial.println("Valor de pwm_B:");
+        Serial.println(comando.pwm_B);
+        Serial.println("Valor da ponte:");
+        Serial.println(comando.ponte);
+        Serial.println("Valor de ponte_B:");
+        Serial.println(comando.ponte_B);
+        Serial.println("Valor de ponte_A:");
+        Serial.println(comando.ponte_A);
+        Serial.println("Valor de angulo:");
+        Serial.println(comando.angulo);
+        Serial.println("Valor de not_used:");
+        Serial.println(comando.not_used);
+        //Serial.print("Comando recebido: ");
+            set_motor_status(comando);    
 
-	// int sei_la = 20;
-  	attachInterrupt(digitalPinToInterrupt(IRQ_ENC_A), enc_check_a, FALLING);  //altera o valor quando  
-	attachInterrupt(digitalPinToInterrupt(IRQ_ENC_B), enc_check_b, FALLING); //altera o valor quando
-	mensagem.angulo = 39;
-	set_motor_status(mensagem);		
+        //Serial.println(data);
+    }
+//    else
+        digitalWrite(LED, 0);
+
+    // int sei_la = 20;
+    // attachInterrupt(digitalPinToInterrupt(IRQ_ENC_A), enc_check_a, FALLING);  //altera o valor quando  
+    // attachInterrupt(digitalPinToInterrupt(IRQ_ENC_B), enc_check_b, FALLING); //altera o valor quando
+    // comando.angulo = 39;
+    set_motor_status(comando);    
 }
