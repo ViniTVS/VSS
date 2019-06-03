@@ -89,16 +89,31 @@ typedef union {
 } TMotCtrl;
 
 //Funciona? não sei. Tem que testar.
-typedef struct {
-    int32_t id  : 4;             // O ID do robo que ira receber a mensagem.
-            msg : 8;             // Char contendo o tipo da mensagem (A, S, D...).
-            pad : 3;             // Algumas informações adicionais dependendo do tipo da mensagem.
-            typedef union {
-                data1 : 8;       // Primeira parte do data.
-                data2 : 9;       // Segunda parte do data.
-            } data;              // Dados que a mensagem recebe.
-} TRadioMsg;
+//typedef struct {
+//    int32_t id  : 4;             // O ID do robo que ira receber a mensagem.
+//            char chr : 8;             // Char contendo o tipo da mensagem (A, S, D...).
+//            bit pad : 3;             // Algumas informações adicionais dependendo do tipo da mensagem.
+//            typedef union {
+//                data1 : 8;       // Primeira parte do data.
+//                data2 : 9;       // Segunda parte do data.
+//            } data : 17;              // Dados que a mensagem recebe.
+//} TRadioMsg;
 
+//typedef union {
+//  uint16_t  data1 :8,
+//  data2 :9;
+//} Data;
+
+typedef union  {
+    struct {
+        uint32_t  id    :4,
+                  chr   :8,
+                  pad   :3,
+                  data1 :8,
+                  data2 :9;
+    } conf;
+    uint32_t  stats = 0;
+} TRadioMsg;
 
 // ------------------------------------------------------------------- //
 //------------------------- VARIAVEIS GLOBAIS ------------------------ //
@@ -124,7 +139,7 @@ uint32_t buffer;
 uint32_t message;
 
 TRadioMsg msg;                             // Mensagem que está sendo executada.
-TradioMsg oldMsg;                          // Ultima mensagem executada.
+TRadioMsg oldMsg;                          // Ultima mensagem executada.
 
 const byte canais[2] = {0x00, 0xFF}; 
 
@@ -145,15 +160,15 @@ void     task_radio_Tx          ( void );
 void     set_rotation           ( int16_t );
 void     set_motor_status       ( uint32_t );
 void     set_speed              ( uint32_t );
-void     flush_radio_buffer     ( TRadioBuf& );
+//void     flush_radio_buffer     ( TRadioBuf& );
 bool     is_rotating            ( void ); 
 bool     is_motor_locked        ( uint8_t );
-bool     is_radio_buffer_full   ( TRadioBuf& );
-bool     is_radio_buffer_empty  ( TRadioBuf& );
+//bool     is_radio_buffer_full   ( TRadioBuf& );
+//bool     is_radio_buffer_empty  ( TRadioBuf& );
 uint8_t  get_node_addr          ( void );
 uint8_t  set_pwm_max            ( void );
-int8_t   write_msg_radio_buffer ( TRadioBuf&, TRadioMsg& );
-int8_t   read_msg_radio_buffer  ( TRadioBuf&, TRadioMsg& );
+//int8_t   write_msg_radio_buffer ( TRadioBuf&, TRadioMsg& );
+//int8_t   read_msg_radio_buffer  ( TRadioBuf&, TRadioMsg& );
 
 uint16_t get_volt_bat           ( void );
 uint32_t get_motor_status       ( void );
@@ -210,8 +225,8 @@ void setup() {
   network.begin(this_node);
 
   // Inicialização dos buffers
-  flush_radio_buffer( &rx_buffer );
-  flush_radio_buffer( &tx_buffer );
+//  flush_radio_buffer( &rx_buffer );
+//  flush_radio_buffer( &tx_buffer );
 
   rotation_FLAG = 0;
   count_enc_a = 0;
@@ -221,7 +236,7 @@ void setup() {
 
   set_motor_status(2678018048);
 
-  	// inicialização de rádio com RF24
+    // inicialização de rádio com RF24
     radio.begin();
     radio.setPALevel(RF24_PA_MAX);
     radio.setDataRate(RF24_2MBPS);
@@ -271,10 +286,10 @@ void tasks_100ms( void ) {
      //              set_motor_status(buffer);
      //          }
      //      }
-  		radio.startListening();
-        if (radio.available())	{
-        	radio.read(&buffer, sizeof(uint32_t));
-        	set_motor_status(buffer);
+      radio.startListening();
+        if (radio.available())  {
+          radio.read(&buffer, sizeof(uint32_t));
+          set_motor_status(buffer);
         }
     }
     //set_motor_status(message); 
@@ -521,5 +536,3 @@ uint8_t get_node_addr( void ){
    if( (digitalRead(RADIO_A0) == LOW) && (digitalRead(RADIO_A1) == LOW) )
     return 3;
 }
-
-

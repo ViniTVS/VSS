@@ -45,6 +45,19 @@ typedef union {
     uint32_t hexa = 0x00000000;   // sempre que declarar uma variável controle, ela iniciará com seus valores zerados
 } mensagem;
 
+typedef union  {
+    struct {
+        uint32_t  id    :4,
+                  chr   :8,
+                  pad   :3,
+                  data1 :8,
+                  data2 :9;
+    } conf;
+    uint32_t  stats = 0;
+} TRadioMsg;
+
+
+
 //  ----------------------- declaração de variáveis globais -----------------------------------
 
 char data_input;
