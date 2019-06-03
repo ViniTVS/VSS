@@ -1,6 +1,4 @@
 //NUMERO MAGICO: 2678018048.
-
-  
 #include <avr/pgmspace.h>
 #include <RF24Network.h>
 #include <RF24.h>
