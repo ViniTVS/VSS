@@ -73,9 +73,10 @@ mensagem data, data_exit;
 // char data_ant = 'n';
 const byte canais[2] = {0x00, 0xFF}; 
 unsigned long final_time;
+TRadioMsg msg;
 
 // --------------------------- declaração de funções e afins --------------------------------
-
+/*
 void translate_input(char input){
     input = toupper(input);
     switch (input){
@@ -121,7 +122,7 @@ void translate_input(char input){
         break;
     }
 }
-
+*/
 void send_message(){
     if (!radio.write( &data.hexa, sizeof(mensagem))) {
         Serial.print("Transmissão ");
@@ -205,6 +206,63 @@ void traduz_str(String ent){
     Serial.println(t1);
 }
 */
+
+//void
+
+void trata_msg(char subs[6][6]){
+    msg.conf.chr = toupper(msg.conf.chr);
+//    Serial.println(input);
+//    Serial.println(subs[2]);
+    msg.conf.pad = 0;
+    switch (msg.conf.chr){
+        case 'D':
+    //        msg.conf. 
+              for (int i= 0; i < 4; i++){
+                  if (subs[2][i] == '0')
+                      msg.conf.pad = msg.conf.pad | 0b0;
+                  else
+                      msg.conf.pad = msg.conf.pad | 0b1;
+                  Serial.print("msg.conf.pad: ");
+                  Serial.println(msg.conf.pad, BIN);
+                  msg.conf.pad = msg.conf.pad << 1;
+             }
+             msg.conf.data.data1 = atoi(subs[3]);
+             msg.conf.data.data2 = atoi(subs[4]);
+             Serial.println(msg.conf.data.data1);
+             Serial.println(msg.conf.data.data2);
+             
+            break;
+        
+        case 'M':
+             msg.conf.data.data1 = atoi(subs[2]);
+             msg.conf.data.data2 = atoi(subs[3]);
+             Serial.print("data1: ");
+             Serial.println(msg.conf.data.data1);
+             Serial.print("data2: ");
+             Serial.println(msg.conf.data.data1);
+    
+            break;
+            
+        case 'S':
+             msg.conf.data.data = atoi(subs[2]);
+             Serial.print("data: ");
+             Serial.println(msg.conf.data.data);
+             
+            break;
+        case 'R':
+             msg.conf.data.data = atoi(subs[2]);
+             Serial.print("data: ");
+             Serial.println(msg.conf.data.data);
+    
+            break;
+        default:
+    //       msg.conf.data.data = atoi(subs[2]);
+        
+            break;
+    }
+}   
+
+
 void traduz_str(String ent){
     char subs[6][6];
 
@@ -222,8 +280,17 @@ void traduz_str(String ent){
         i++;
         k++;
     }
-    
- 
+//    int t1;
+
+    msg.conf.id   = atoi(subs[0]);
+    msg.conf.chr  = subs[1][0];
+    Serial.print("msg.id: ");
+    Serial.println(msg.conf.id);
+    Serial.print("chr: ");
+    Serial.println(msg.conf.chr);
+    trata_msg (subs);
+    byte t2;
+//    string.getBytes(buf, len)
 }
 
 
@@ -248,7 +315,7 @@ void loop() {
       traduz_str(v);    
     }
     else
-      Serial.println("Não funfou");
+      Serial.println("Serial indisponível");
 
 
     delay(500);
