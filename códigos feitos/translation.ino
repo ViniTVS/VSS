@@ -208,7 +208,6 @@ void traduz_str(String ent){
 */
 
 //void
-
 void trata_msg(char subs[6][6]){
     msg.conf.chr = toupper(msg.conf.chr);
 //    Serial.println(input);
@@ -217,6 +216,7 @@ void trata_msg(char subs[6][6]){
     switch (msg.conf.chr){
         case 'D':
     //        msg.conf. 
+              // "tradução" da 3a string p/ os bits da pad
               for (int i= 0; i < 4; i++){
                   if (subs[2][i] == '0')
                       msg.conf.pad = msg.conf.pad | 0b0;
@@ -226,6 +226,7 @@ void trata_msg(char subs[6][6]){
                   Serial.println(msg.conf.pad, BIN);
                   msg.conf.pad = msg.conf.pad << 1;
              }
+             
              msg.conf.data.data1 = atoi(subs[3]);
              msg.conf.data.data2 = atoi(subs[4]);
              Serial.println(msg.conf.data.data1);
@@ -250,6 +251,11 @@ void trata_msg(char subs[6][6]){
              
             break;
         case 'R':
+             // se os graus forem negativos, o pad recebe 1111 e o número deixa de ser negativo p/ evitar overflow(ou sei lá)
+             if (subs[2][0] == '-'){
+                msg.conf.pad = 0xf;
+                subs[2][0] = 0;
+             }
              msg.conf.data.data = atoi(subs[2]);
              Serial.print("data: ");
              Serial.println(msg.conf.data.data);
@@ -289,7 +295,7 @@ void traduz_str(String ent){
     Serial.print("chr: ");
     Serial.println(msg.conf.chr);
     trata_msg (subs);
-    byte t2;
+//    byte t2;
 //    string.getBytes(buf, len)
 }
 

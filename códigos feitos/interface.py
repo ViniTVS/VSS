@@ -13,25 +13,13 @@ ArduinoSerial = serial.Serial(porta,SSPEED)
 #ArduinoSerial.write('n')	
 string = "quero que fe"
 
-print ("Precione [p] para sair:")
+print ("Digite [p] para sair:")
 # string = raw_input("digite algo:")	
 
 while True:
     #entrada = 'n'				# defino o dado como n p/ funcionar semelhante a um nop e não pegar lixo de memória
 	# pega chars como entrada sem a necesidade de teclar enter
-	string = raw_input("digite algo:")	
+	string = raw_input("Comando:")
+	if string[0] == 'p' or string[0] == 'P':
+		break
 	ArduinoSerial.write(string)
-
-
-	# while i < 10**90:
-	# 	i = i + 1
-	# 	if i == 100:
-	# 		ArduinoSerial.write(string)
-			
-	# break
-		# print(i)
-
-	#print ("A entrada foi:"),entrada
-	# time(500)
-	# if entrada == 'p' or entrada == 'P':		# critério p/ sair do loop
-		# break
