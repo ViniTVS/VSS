@@ -45,21 +45,13 @@ typedef union {
     uint32_t hexa = 0x00000000;   // sempre que declarar uma variável controle, ela iniciará com seus valores zerados
 } mensagem;
 
-typedef union {
-    struct {
-          uint16_t  data1 :8,
-                    data2 :8; 
-    };
-    int16_t data;
-} Data;
-
-
 typedef union  {
     struct {
-        char      chr;
-        uint8_t   id    :4,
-                  pad   :4;
-        Data      data;
+        uint32_t  id    :4,
+                  chr   :8,
+                  pad   :3,
+                  data1 :8,
+                  data2 :9;
     } conf;
     uint32_t  stats = 0;
 } TRadioMsg;
@@ -73,10 +65,9 @@ mensagem data, data_exit;
 // char data_ant = 'n';
 const byte canais[2] = {0x00, 0xFF}; 
 unsigned long final_time;
-TRadioMsg msg;
 
 // --------------------------- declaração de funções e afins --------------------------------
-/*
+
 void translate_input(char input){
     input = toupper(input);
     switch (input){
@@ -122,7 +113,7 @@ void translate_input(char input){
         break;
     }
 }
-*/
+
 void send_message(){
     if (!radio.write( &data.hexa, sizeof(mensagem))) {
         Serial.print("Transmissão ");
@@ -176,152 +167,22 @@ void setup() {
 
     data.pwm_A = 50;    data.pwm_B = 50;
 }
-/*
-void traduz_str(String ent){
-    String aux;
-    char res[2];
-    char chr;
-    long t1;
-    uint16_t t2;
-    int i = 0, j = 0;
-    String *teste;
-
-    chr = ent[0];
-//    Serial.print("Char: ");
-//    Serial.println(chr);
-    while (true){
-        if (ent[i] == ' ' || ent[i] == '!'){
-            Serial.println(" 'qreba'");
-            break;
-        }
-        else{
-            res[i] = ent[i];
-            Serial.print(ent[i]);
-            i++;
-        }
-    }
-    Serial.println(aux);
-    t1 = atoi(res);
-    Serial.print("Id: ");
-    Serial.println(t1);
-}
-*/
-
-//void
-void trata_msg(char subs[6][6]){
-    msg.conf.chr = toupper(msg.conf.chr);
-//    Serial.println(input);
-//    Serial.println(subs[2]);
-    msg.conf.pad = 0;
-    switch (msg.conf.chr){
-        case 'D':
-    //        msg.conf. 
-              // "tradução" da 3a string p/ os bits da pad
-              for (int i= 0; i < 4; i++){
-                  if (subs[2][i] == '0')
-                      msg.conf.pad = msg.conf.pad | 0b0;
-                  else
-                      msg.conf.pad = msg.conf.pad | 0b1;
-                  Serial.print("msg.conf.pad: ");
-                  Serial.println(msg.conf.pad, BIN);
-                  msg.conf.pad = msg.conf.pad << 1;
-             }
-             
-             msg.conf.data.data1 = atoi(subs[3]);
-             msg.conf.data.data2 = atoi(subs[4]);
-             Serial.println(msg.conf.data.data1);
-             Serial.println(msg.conf.data.data2);
-             
-            break;
-        
-        case 'M':
-             msg.conf.data.data1 = atoi(subs[2]);
-             msg.conf.data.data2 = atoi(subs[3]);
-             Serial.print("data1: ");
-             Serial.println(msg.conf.data.data1);
-             Serial.print("data2: ");
-             Serial.println(msg.conf.data.data1);
-    
-            break;
-            
-        case 'S':
-             msg.conf.data.data = atoi(subs[2]);
-             Serial.print("data: ");
-             Serial.println(msg.conf.data.data);
-             
-            break;
-        case 'R':
-             // se os graus forem negativos, o pad recebe 1111 e o número deixa de ser negativo p/ evitar overflow(ou sei lá)
-             if (subs[2][0] == '-'){
-                msg.conf.pad = 0xf;
-                subs[2][0] = 0;
-             }
-             msg.conf.data.data = atoi(subs[2]);
-             Serial.print("data: ");
-             Serial.println(msg.conf.data.data);
-    
-            break;
-        default:
-    //       msg.conf.data.data = atoi(subs[2]);
-        
-            break;
-    }
-}   
-
-
-void traduz_str(String ent){
-    char subs[6][6];
-
-    int j, i = 0, k = 0;
-  
-    while(ent[i] != '\0') {
-        j = 0;
-        while ((ent[i] != ' ') && (ent[i] != '\0')) {
-            subs[k][j] = ent[i];
-            i++;
-            j++;
-        }
-        subs[k][j] = '\0';
-        Serial.println(subs[k]);
-        i++;
-        k++;
-    }
-//    int t1;
-
-    msg.conf.id   = atoi(subs[0]);
-    msg.conf.chr  = subs[1][0];
-    Serial.print("msg.id: ");
-    Serial.println(msg.conf.id);
-    Serial.print("chr: ");
-    Serial.println(msg.conf.chr);
-    trata_msg (subs);
-//    byte t2;
-//    string.getBytes(buf, len)
-}
-
 
 void loop() {
-//
-//    unsigned long started_waiting_at = millis();
-//    if (Serial.available()/* && (millis() - started_waiting_at < 100 )*/){
-//        data_input = Serial.read();
-//        final_time = millis();
-//    }
-//    if (final_time - started_waiting_at > 3000 )      // se o usuário demorar p/ mandar um dado, decido deixar o robô parado
-//        data_input = 'x';
-//    translate_input(data_input);
-//    Serial.println(data.hexa,HEX);
-//    send_message();
-//    // if (data == 'l')
-//    //     digitalWrite (L1G, HIGH);    // este é um teste simples: ligo o LED caso a entrada seja l
-    String v;
-    if (Serial.available()){
-      v = Serial.readString();
-      Serial.println(v);
-      traduz_str(v);    
+    unsigned long started_waiting_at = millis();
+    if (Serial.available()/* && (millis() - started_waiting_at < 100 )*/){
+        data_input = Serial.read();
+        final_time = millis();
     }
-    else
-      Serial.println("Serial indisponível");
+    if (final_time - started_waiting_at > 3000 )      // se o usuário demorar p/ mandar um dado, decido deixar o robô parado
+        data_input = 'x';
+    translate_input(data_input);
+    Serial.println(data.hexa,HEX);
+    send_message();
+    // if (data == 'l')
+    //     digitalWrite (L1G, HIGH);    // este é um teste simples: ligo o LED caso a entrada seja l
+
+    
 
 
     delay(500);

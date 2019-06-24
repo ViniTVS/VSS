@@ -3,15 +3,17 @@ from getch import getch
 import serial
 # from serial import Serial
 
-SSPEED = 115200
-print ("Escreva a porta conforme comentado no código")
-porta = input("Porta conectada: ")	# é necessário que o usuário forneça a porta p/ conexão serial
-									# exemplo: '/dev/ttyUSB0' (é necessário o uso de aspas simples)
+SSPEED = 115200 #favor não alterar o valor
+
+# é necessário que o usuário forneça a porta p/ conexão serial
+print ("Escreva a porta a qual a base está conectada.")
+print ("Ex: '/dev/ttyUSB0' (é necessário o uso de aspas simples) \n")
+porta = input("Porta conectada: ")	
 ArduinoSerial = serial.Serial(porta,SSPEED)
 #time.sleep(2)
 #print ArduinoSerial.readline()
 #ArduinoSerial.write('n')	
-string = "quero que fe"
+string = " "
 
 print ("Digite [p] para sair:")
 # string = raw_input("digite algo:")	

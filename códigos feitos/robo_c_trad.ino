@@ -152,10 +152,11 @@ void     encoderB               ( void );
 void     task_radio_Rx          ( void );
 void     task_radio_Tx          ( void );
 
-void     messageM               ( void );
-void     messageR               ( void );
-void     messageS               ( void );
+void     messageM               ( uint8_t, uint8_t, uint8_t );
+void     messageR               ( uint16_t );
+void     messageS               ( uint8_t, uint16_t );
 void     messageP               ( void );
+void     messageD               ( int, uint8_t, uint8_t);
 
 void     set_rotation           ( int16_t );
 void     set_motor_status       ( uint32_t );
@@ -267,8 +268,9 @@ void tasks_100ms( void ) {
 
       radio.startListening();
         if (radio.available())  {
-          radio.read(&buffer, sizeof(uint32_t));
-          (buffer);
+          radio.read(&msg.stats, sizeof(uint32_t));
+          read_message(msg);
+          set_motor_status(motor.status);
         }
     }
 
@@ -348,7 +350,7 @@ void encoderB() {
 //Talvez de para mudar a forma como ele checa o freio eletrico (verificar a corretude, tambem).
 
 //Seta o status do motor, no caso ajusta a ponte H, pwm...
-void set_motor_status( uint32_t state) {
+void set_motor_status( uint32_t state ) {
     
   motor.status = state;
   
@@ -520,7 +522,7 @@ bool notDist (uint32_t A, uint32_t B) {
 void messageM (uint8_t pad, uint8_t dist, uint8_t speed) {
 
   // Caso o pad seja para a "velocidade negativa", inverte a ponte H.
-  if (pad == '-') {
+  if (pad == 0b1111) {
       digitalWrite(MTR_AIN1, !bitRead(motor.config.dir_motor_A, 1));
       digitalWrite(MTR_AIN2, !bitRead(motor.config.dir_motor_A, 0));
       digitalWrite(MTR_BIN1, !bitRead(motor.config.dir_motor_B, 0));
@@ -546,8 +548,8 @@ void messageM (uint8_t pad, uint8_t dist, uint8_t speed) {
 void messageS (uint8_t pad, uint16_t speed) {
 
   // Caso o pad seja para a "velocidade negativa", inverte a ponte H.
-  if (pad == '-') {
-    digitalWrite(MTR_AIN1, !bitRead(motor.config.dir_motor_A, 1));
+  if (pad == 0b1111) {
+      digitalWrite(MTR_AIN1, !bitRead(motor.config.dir_motor_A, 1));
       digitalWrite(MTR_AIN2, !bitRead(motor.config.dir_motor_A, 0));
       digitalWrite(MTR_BIN1, !bitRead(motor.config.dir_motor_B, 0));
       digitalWrite(MTR_BIN2, !bitRead(motor.config.dir_motor_B, 1));
@@ -556,6 +558,14 @@ void messageS (uint8_t pad, uint16_t speed) {
   set_speed(0, speed);
 
   oldMsg = msg;
+}
+
+void messageD (int pad, uint8_t pwm1, uint8_t pwm2) {
+  motor.config.dir_motor_B = pad;       // ponte B recebe os 2 últimos bits do pad
+  motor.config.dir_motor_A = pad >> 2;  // ponte A recebe os 2 primeiros bits do pad
+
+  motor.config.pwm_motor_A = pwm1;
+  motor.config.pwm_motor_B = pwm2;
 }
 
 void messageR (uint16_t graus) {
@@ -601,6 +611,10 @@ void read_message (TRadioMsg message) {
 
     case 'P':
       messageP();
+    break;
+
+    case 'D':
+      messageD(message.conf.pad, message.conf.data.data1 ,message.conf.data.data2);
     break;
 
     default:
