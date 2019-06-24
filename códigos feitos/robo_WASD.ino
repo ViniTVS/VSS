@@ -88,32 +88,18 @@ typedef union {
   uint32_t status = 0;           // Leitura/Escrita simuntânea do conjunto de variáveis.
 } TMotCtrl;
 
-//Funciona? não sei. Tem que testar.
-//typedef struct {
-//    int32_t id  : 4;             // O ID do robo que ira receber a mensagem.
-//            char chr : 8;             // Char contendo o tipo da mensagem (A, S, D...).
-//            bit pad : 3;             // Algumas informações adicionais dependendo do tipo da mensagem.
-//            typedef union {
-//                data1 : 8;       // Primeira parte do data.
-//                data2 : 9;       // Segunda parte do data.
-//            } data : 17;              // Dados que a mensagem recebe.
-//} TRadioMsg;
-
-//typedef union {
-//  uint16_t  data1 :8,
-//  data2 :9;
-//} Data;
-
-typedef union  {
-    struct {
-        uint32_t  id    :4,
-                  chr   :8,
-                  pad   :3,
-                  data1 :8,
-                  data2 :9;
-    } conf;
-    uint32_t  stats = 0;
+typedef struct {
+    uint8_t  type;              // 1 byte  - Tipo da mensagem
+    uint32_t data;              // 4 bytes - Dado da mensagem
 } TRadioMsg;
+
+typedef struct {
+    uint8_t   head;              // Índice do primeiro elemento da fila
+    uint8_t   tail;              // Índice do último elemento da fila
+    uint8_t   tam;               // Número de mensagens na fila
+    uint32_t  last_t;            // Última transmissão ou recepção
+    TRadioMsg msg[TAM_BUFFER];   // Fila de mensagens
+} TRadioBuf;
 
 // ------------------------------------------------------------------- //
 //------------------------- VARIAVEIS GLOBAIS ------------------------ //
@@ -127,6 +113,7 @@ TMotCtrl motor;                            //Variavel global que contra o motor.
 //Parte da inicializacao do radio.
 RF24        radio   (RADIO_CE, RADIO_CS);  // Instância do rádio.
 RF24Network network (radio);               // Instância da rede.
+TRadioBuf   rx_buffer, tx_buffer;          // Buffers para mensagens (Rx & Tx). 
 
 bool rotation_FLAG;
 
@@ -137,9 +124,6 @@ uint16_t  base_node, this_node;            // End. do nó remoto (base) e deste 
 uint8_t  recv;
 uint32_t buffer;
 uint32_t message;
-
-TRadioMsg msg;                             // Mensagem que está sendo executada.
-TRadioMsg oldMsg;                          // Ultima mensagem executada.
 
 const byte canais[2] = {0x00, 0xFF}; 
 
@@ -160,15 +144,15 @@ void     task_radio_Tx          ( void );
 void     set_rotation           ( int16_t );
 void     set_motor_status       ( uint32_t );
 void     set_speed              ( uint32_t );
-//void     flush_radio_buffer     ( TRadioBuf& );
+void     flush_radio_buffer     ( TRadioBuf& );
 bool     is_rotating            ( void ); 
 bool     is_motor_locked        ( uint8_t );
-//bool     is_radio_buffer_full   ( TRadioBuf& );
-//bool     is_radio_buffer_empty  ( TRadioBuf& );
+bool     is_radio_buffer_full   ( TRadioBuf& );
+bool     is_radio_buffer_empty  ( TRadioBuf& );
 uint8_t  get_node_addr          ( void );
 uint8_t  set_pwm_max            ( void );
-//int8_t   write_msg_radio_buffer ( TRadioBuf&, TRadioMsg& );
-//int8_t   read_msg_radio_buffer  ( TRadioBuf&, TRadioMsg& );
+int8_t   write_msg_radio_buffer ( TRadioBuf&, TRadioMsg& );
+int8_t   read_msg_radio_buffer  ( TRadioBuf&, TRadioMsg& );
 
 uint16_t get_volt_bat           ( void );
 uint32_t get_motor_status       ( void );
@@ -225,8 +209,8 @@ void setup() {
   network.begin(this_node);
 
   // Inicialização dos buffers
-//  flush_radio_buffer( &rx_buffer );
-//  flush_radio_buffer( &tx_buffer );
+  flush_radio_buffer( &rx_buffer );
+  flush_radio_buffer( &tx_buffer );
 
   rotation_FLAG = 0;
   count_enc_a = 0;
@@ -236,7 +220,7 @@ void setup() {
 
   set_motor_status(2678018048);
 
-    // inicialização de rádio com RF24
+  	// inicialização de rádio com RF24
     radio.begin();
     radio.setPALevel(RF24_PA_MAX);
     radio.setDataRate(RF24_2MBPS);
@@ -286,10 +270,10 @@ void tasks_100ms( void ) {
      //              set_motor_status(buffer);
      //          }
      //      }
-      radio.startListening();
-        if (radio.available())  {
-          radio.read(&buffer, sizeof(uint32_t));
-          set_motor_status(buffer);
+  		radio.startListening();
+        if (radio.available())	{
+        	radio.read(&buffer, sizeof(uint32_t));
+        	set_motor_status(buffer);
         }
     }
     //set_motor_status(message); 
@@ -535,4 +519,153 @@ uint8_t get_node_addr( void ){
     return 2;
    if( (digitalRead(RADIO_A0) == LOW) && (digitalRead(RADIO_A1) == LOW) )
     return 3;
+}
+
+//Le mensagem do buffer do hardware e as armazena em um buffer (rx_buffer).
+void task_radio_Rx( void ) {
+
+  if( !network.available() ) 
+    return;
+  
+  TRadioMsg msg;
+  RF24NetworkHeader header;
+  
+  while( network.available() && !is_radio_buffer_full(&rx_buffer) ) {
+    network.read(header, &msg.data, sizeof(msg.data));
+    msg.type  = header.type;
+    write_msg_radio_buffer(&rx_buffer, &msg);
+  }
+}
+
+//Encaminha as mensagens que foram postas no buffer para serem transmitidas.
+void task_radio_Tx( void ) {
+    TRadioMsg msg;
+    while ( !is_radio_buffer_empty(&tx_buffer) ){    
+      read_msg_radio_buffer( &tx_buffer, &msg );
+      RF24NetworkHeader header(base_node, msg.type);
+      network.write(header, &msg.data, sizeof(msg.data));
+    }
+}
+
+//"Executa" a mensagem dada o tipo dela (A, C, S, R, M, V, Z ou N).
+void dispatch_msgs( void ){
+  if( is_radio_buffer_empty(&rx_buffer) ) return;
+        
+  TRadioMsg msg;
+  read_msg_radio_buffer( &rx_buffer, &msg );
+
+  switch ( msg.type ){
+
+    // Leitura do endereço do nó
+    case 'A':   get_node_addr(); 
+    break;
+
+    // Ajusta curso (rotação, sentido e velocidade)
+    case 'C':   if( is_rotating() )
+      write_msg_radio_buffer( &rx_buffer, &msg );
+      else set_speed( msg.data );
+    break;
+
+    // Ajuste individual das vels. dos motores
+    case 'S':   if( is_rotating() )
+        write_msg_radio_buffer( &rx_buffer, &msg );
+      else set_speed( msg.data );
+    break;
+
+    // Rotação do robô
+    case 'R' :  if( is_rotating() )
+      write_msg_radio_buffer( &rx_buffer, &msg );
+      else set_rotation( msg.data ); 
+      Serial.println(msg.data, HEX);
+    break;
+
+    // Leitura/Config. direta dos params. dos motores
+    case 'M' :  if( is_rotating() )
+      write_msg_radio_buffer( &rx_buffer, &msg );
+      else if( msg.data > 0xFFFFF ) 
+        get_motor_status( );
+      else {
+        //mov.config.ctr_pid_en = 0;
+        //set_motor_status( msg.data );
+      }
+    break;
+
+      // Leitura da tensão da bateria
+    case 'V':   get_volt_bat(); 
+    break;
+
+    // Reinicio o Arduino por SW
+    //case 'Z': soft_reset();
+    //break;
+        
+    // Altera o canal de rádio do robô
+    //case 'N': set_network_channel( (uint8_t)(msg.data) );
+    //break;
+
+    // Mensagens com tipos desconhecidos são devolvidas à base
+    default: write_msg_radio_buffer( &tx_buffer, &msg );
+  }
+
+}
+
+//Coloca uma mensagem no buffer interno do sistema.
+int8_t write_msg_radio_buffer( TRadioBuf *buf, TRadioMsg *msg ){
+  //Verifica se o buffer esta cheio.
+  if( buf->tam == TAM_BUFFER ) 
+    return -1;
+  
+  //Coloca a mensagem no final do buffer.
+  buf->msg[buf->tail].type = msg->type;
+  buf->msg[buf->tail].data = msg->data;
+  
+  //Verifica se a tail nao esta no final do buffer.
+  if( ++buf->tail == TAM_BUFFER ) 
+    buf->tail = 0;
+  
+  //Arruma o tamanho do buffer.
+  buf->tam++;
+
+  return ( TAM_BUFFER - buf->tam );        // Retorna: espaço restante
+}
+
+int8_t read_msg_radio_buffer( TRadioBuf *buf, TRadioMsg *msg ){
+  
+  //Verifica se o buffer nao esta vazio.
+  if( buf->tam == 0 ) 
+    return -1;           // Erro, buffer vazio
+  
+  //A mensagem que sera executada recebe a mensagem que esta no comeco do buffer.
+  msg->type = buf->msg[buf->head].type;
+  msg->data = buf->msg[buf->head].data;
+  
+  //verifica se a head nao esta no final do buffer.
+  if( ++buf->head == TAM_BUFFER ) 
+    buf->head = 0;
+  
+  //Diminui o tamanho do buffer.
+  buf->tam--;
+  
+  return buf->tam;                         // Retorna: espaço ocupado
+}
+
+//Reinicia o buffer, setando tudo em 0.
+void flush_radio_buffer( TRadioBuf *buf ){
+  buf->head   = 0;
+  buf->tail   = 0;
+  buf->tam    = 0;
+  buf->last_t = 0;
+}
+
+//Verifica se o buffer esta cheio.
+bool is_radio_buffer_full( TRadioBuf *buf ){
+  if (buf->tam == TAM_BUFFER)
+    return 1;
+  return 0;
+}
+
+//verifica se o buffer esta vazio
+bool is_radio_buffer_empty( TRadioBuf *buf ){
+  if (buf->tam == 0)
+    return 1;
+  return 0;
 }

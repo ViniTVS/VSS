@@ -131,6 +131,8 @@ uint8_t  recv;
 uint32_t buffer;
 uint32_t message;
 
+uint8_t address;
+
 TRadioMsg msg;                             // Mensagem que está sendo executada.
 TRadioMsg oldMsg;                          // Ultima mensagem executada.
 
@@ -169,6 +171,8 @@ uint8_t  set_pwm_max            ( void );
 
 uint16_t get_volt_bat           ( void );
 uint32_t get_motor_status       ( void );
+
+uint8_t  get_node_addr          ( void );
 
 
 // ------------------------------------------------------------------- //
@@ -236,6 +240,8 @@ void setup() {
   radio.openWritingPipe(canais[0]);
   radio.openReadingPipe(1, canais[1]);
   radio.startListening();
+
+  address = get_node_addr();
 }
 
 //Main loop, o que o robo fica fazendo "pra sempre".
@@ -269,8 +275,13 @@ void tasks_100ms( void ) {
       radio.startListening();
         if (radio.available())  {
           radio.read(&msg.stats, sizeof(uint32_t));
+          Serial.println(msg.stats, HEX);
           read_message(msg);
-          set_motor_status(motor.status);
+          Serial.println(msg.stats);
+          if (address == msg.conf.id)
+            set_motor_status(motor.status);
+          else
+            set_motor_status(0);
         }
     }
 
@@ -494,14 +505,12 @@ void set_rotation ( int16_t rotation ) {
 
 //Acha e devolve de forma "fisica" o ID do robo que sera utilizado pelo radio.
 uint8_t get_node_addr( void ){
-   if( (digitalRead(RADIO_A0) == HIGH) && (digitalRead(RADIO_A1) == HIGH) )
-    return 0;
-   if( (digitalRead(RADIO_A0) == HIGH) && (digitalRead(RADIO_A1) == LOW) )
-    return 1;
-   if( (digitalRead(RADIO_A0) == LOW) && (digitalRead(RADIO_A1) == HIGH) )
-    return 2;
-   if( (digitalRead(RADIO_A0) == LOW) && (digitalRead(RADIO_A1) == LOW) )
-    return 3;
+  uint8_t add = 0x0;
+  add = add | !digitalRead(RADIO_A1);
+  add = add << 1;
+  add = add | !digitalRead(RADIO_A0);
+
+  return add;
 }
 
 // ------------------------------------------------------------------- //
@@ -591,8 +600,12 @@ void messageP () {
 }
 
 void read_message (TRadioMsg message) {
+  Serial.println("read_message");  
+  Serial.println(message.stats, HEX);
 
-  uint8_t ID = message.conf.id;
+  char ID = message.conf.chr;
+  Serial.print("Char ID:");
+  Serial.println(message.conf.chr);
   uint8_t pad;
   switch(ID) {
     case 'M':
