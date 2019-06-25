@@ -159,6 +159,8 @@ void     messageR               ( uint16_t );
 void     messageS               ( uint8_t, uint16_t );
 void     messageP               ( void );
 void     messageD               ( int, uint8_t, uint8_t);
+void     read_message           ( TRadioMsg ); 
+
 
 void     set_rotation           ( int16_t );
 void     set_motor_status       ( uint32_t );
@@ -280,8 +282,7 @@ void tasks_100ms( void ) {
           Serial.println(msg.stats);
           if (address == msg.conf.id)
             set_motor_status(motor.status);
-          else
-            set_motor_status(0);
+
         }
     }
 
@@ -472,7 +473,8 @@ void set_speed ( uint8_t speed1, uint16_t speed2) {
 }
 
 //rotaciona o robo.
-void set_rotation ( int16_t rotation ) {
+void set_rotation ( uint16_t rotation ) {
+  
 
   uint16_t speed = 0 ;
   uint16_t deg   = (rotation & 0x3FF)%360;
@@ -482,19 +484,41 @@ void set_rotation ( int16_t rotation ) {
   deg = (tks * 75) / 10;
 
   //Gira para a esquerda.
-  if (rotation > 0){
+  if (msg.conf.pad != 0){
     is_rotating = 1;
-  //set_speed();
+    count_enc_a = 0;
+    digitalWrite(MTR_BIN1, 0);
+    digitalWrite(MTR_BIN2, 0);    
+    digitalWrite(MTR_AIN1, 1);
+    digitalWrite(MTR_AIN2, 0);     
+    motor.config.dir_motor_B = 0b00;
+      set_speed(100, 0);
+    while ( count_enc_a < tks){
+      attachInterrupt(0, encoderA, RISING);  
+    }   
   //Gira para a direita.
-  } else if (rotation < 0) {
+  } else{
     is_rotating = 1;
-    //set_speed();
- 
-  //Nao gira.
-  } else 
-    is_rotating = 0;
+    count_enc_b = 0;
+    digitalWrite(MTR_AIN1, 0);
+    digitalWrite(MTR_AIN2, 0);    
+    digitalWrite(MTR_BIN1, 1);
+    digitalWrite(MTR_BIN2, 0);    
+    motor.config.dir_motor_A = 0b00;
+      set_speed(100, 0);
+    while ( count_enc_b < tks){
+      attachInterrupt(0, encoderB, RISING);  
+    }
+  } 
 
+    is_rotating = 0;
+    digitalWrite(MTR_AIN1, 0);
+    digitalWrite(MTR_AIN2, 0);    
+    digitalWrite(MTR_BIN1, 0);
+    digitalWrite(MTR_BIN2, 0);
+    delay(1000000); 
 }
+void     read_message           ( TRadioMsg ); 
 
 // ------------------------------------------------------------------- //
 // ----------------------------- RADIO ------------------------------- //
@@ -583,18 +607,13 @@ void messageR (uint16_t graus) {
 }
 
 void messageP () {
-  
-  while(!is_motor_locked()){
-    digitalWrite(HBRID_EN, LOW);
-
-    digitalWrite(MTR_AIN1, bitRead(motor.config.dir_motor_A, 0));
-    digitalWrite(MTR_AIN2, bitRead(motor.config.dir_motor_A, 0));
-    digitalWrite(MTR_BIN1, bitRead(motor.config.dir_motor_B, 0));
-    digitalWrite(MTR_BIN2, bitRead(motor.config.dir_motor_B, 0));
-
-    digitalWrite(HBRID_EN, HIGH);
-  }
-
+  //ativo o freio elétrico
+  digitalWrite(MTR_AIN1, 0);
+  digitalWrite(MTR_AIN2, 0);
+  digitalWrite(MTR_BIN1, 0);
+  digitalWrite(MTR_BIN2, 0);
+  motor.config.dir_motor_B = 0;
+  motor.config.dir_motor_A = 0;    
   oldMsg = msg;
 
 }

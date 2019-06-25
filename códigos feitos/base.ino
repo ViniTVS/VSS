@@ -254,11 +254,24 @@ void trata_msg(char subs[5][6]){
             break;
         case 'R':
              // se os graus forem negativos, o pad recebe 1111 e o número deixa de ser negativo p/ evitar overflow(ou sei lá)
+             Serial.print("Mensagem tipo R. subs [2][0]:");
+             Serial.println(subs[2][0]);
              if (subs[2][0] == '-'){
-                msg.conf.pad = 0xf;
-                subs[2][0] = 0;
+                Serial.println("negativo");
+                msg.conf.pad = 0b1111;
+                Serial.println(msg.conf.pad);
+                subs[2][0] = '0';
+//                for (int t = 0; t < 3; t++)
+//                  Serial.print(subs[2][t]);
+                
              }
+             else
+                msg.conf.pad = 0b0000;
+
              msg.conf.data.data = atoi(subs[2]);
+//             Serial.print("atoi: ");
+//             Serial.println(msg.conf.data.data);
+
 //             Serial.print("data: ");
 //             Serial.println(msg.conf.data.data);
     
@@ -284,7 +297,7 @@ void traduz_str(String ent){
             j++;
         }
         subs[k][j] = '\0';
-//        Serial.println(subs[k]);
+        Serial.println(subs[k]);
         i++;
         k++;
     }
@@ -319,12 +332,13 @@ void loop() {
     String v;
     if (Serial.available()){
         v = Serial.readString();
-//        Serial.println(v);  // eco de mensagem recebida
-//        traduz_str(v);    
+//      Serial.println(v);  // eco de mensagem recebida
+//      traduz_str(v);    
+        traduz_str(v);
+        send_message();
     }
-//    else
+    else
+      v = ' ';
 //        Serial.println("Serial indisponível");
-    traduz_str(v);
-    send_message();
     // delay(50);
 }
