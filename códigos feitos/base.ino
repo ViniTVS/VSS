@@ -333,7 +333,7 @@ void loop() {
     if (Serial.available()){
         v = Serial.readString();
 //      Serial.println(v);  // eco de mensagem recebida
-//      traduz_str(v);    
+//      traduz_str(v);
         traduz_str(v);
         send_message();
     }

@@ -284,6 +284,7 @@ void tasks_100ms( void ) {
             set_motor_status(motor.status);
 
         }
+
     }
 
 //    get_speed();
@@ -297,10 +298,12 @@ void tasks_1min( void ) {
 
     // Caso a bateria esteja fraca, desliga o robo.
     if (get_volt_bat() < DEAD_BAT){
-      digitalWrite(MTR_AIN1, bitRead(motor.config.dir_motor_A, 0));
-      digitalWrite(MTR_AIN2, bitRead(motor.config.dir_motor_A, 0));
-      digitalWrite(MTR_BIN1, bitRead(motor.config.dir_motor_B, 0));
-    digitalWrite(MTR_BIN2, bitRead(motor.config.dir_motor_B, 0));
+      digitalWrite(MTR_AIN1, 0);
+      digitalWrite(MTR_AIN2, 0);
+      digitalWrite(MTR_BIN1, 0);
+      digitalWrite(MTR_BIN2, 0);
+      // imagine que liga o LED quando acabar a bateria
+      digitalWrite(LED, 1);    
     }
 
   }
@@ -562,8 +565,8 @@ uint8_t get_node_addr( void ){
 bool notDist (uint32_t A, uint32_t B) {
 
   if ( (A - count_enc_a < 0 ) && (B - count_enc_b < 0))
-    return 1;
-  return 0; 
+    return 0;
+  return 1; 
 }
 
 // ------------------------------------------------------------------- //
@@ -573,24 +576,55 @@ bool notDist (uint32_t A, uint32_t B) {
 void messageM (uint8_t pad, uint8_t dist, uint8_t speed) {
 
   // Caso o pad seja para a "velocidade negativa", inverte a ponte H.
+  /*
   if (pad == 0b1111) {
       digitalWrite(MTR_AIN1, !bitRead(motor.config.dir_motor_A, 1));
       digitalWrite(MTR_AIN2, !bitRead(motor.config.dir_motor_A, 0));
       digitalWrite(MTR_BIN1, !bitRead(motor.config.dir_motor_B, 0));
       digitalWrite(MTR_BIN2, !bitRead(motor.config.dir_motor_B, 1));
-  }
+  }*/
+  digitalWrite(MTR_AIN1, 1);
+  digitalWrite(MTR_AIN2, 0);
+  digitalWrite(MTR_BIN1, 1);
+  digitalWrite(MTR_BIN2, 0);
+  motor.config.dir_motor_A = 0b01;
+  motor.config.dir_motor_B = 0b01;
 
+  
   // Variaveis para ajustar a distancia.
   uint32_t x = ((uint32_t)dist/dist_ticks);
-  uint32_t auxDistA = encoderA + x;
-  uint32_t auxDistB = encoderB + x;
+//  uint32_t au/xDistA = encoderA + x;
+  count_enc_b = 0;
+//  Serial.println(auxDis/tA);
+//  uint32_t auxDi/stB = encoderB + x;
+///  Serial.println(auxDistB);
+  Serial.print("Valor de x:");
+  Serial.println(x);
 
   // A velocidade que ele ira se mover.
 
-  set_speed(speed, 0);
+//  set_speed(speed, 0);/
+  int new_speed;
+  // basta fazer que a vel. máx. equivale a 50cm/s
+  new_speed = 159*speed/50;
+  set_speed(0, new_speed);
 
+  
   // Enquanto não tiver terminado de andar aquela distancia, continua no estado atual.
-  while (notDist(auxDistA, auxDistB))
+  while (x > count_enc_b){
+      attachInterrupt(3, encoderB, RISING);  
+      Serial.println(count_enc_b);
+      attachInterrupt(2, encoderA, RISING);  
+      Serial.println(count_enc_a);
+    
+  }
+
+  digitalWrite(MTR_AIN1, 0);
+  digitalWrite(MTR_AIN2, 0);
+  digitalWrite(MTR_BIN1, 0);
+  digitalWrite(MTR_BIN2, 0);
+  motor.config.dir_motor_A = 0b00;
+  motor.config.dir_motor_B = 0b00;
 
   // Coloca a mensagem que acabou de executar como se fosse a "ultima".
   oldMsg = msg;
