@@ -280,7 +280,7 @@ void tasks_100ms( void ) {
           Serial.println(msg.stats, HEX);
           read_message(msg);
           Serial.println(msg.stats);
-          if (address == msg.conf.id)
+          if (address == msg.conf.id || msg.conf.id == 0)
             set_motor_status(motor.status);
 
         }
@@ -475,13 +475,21 @@ void set_speed ( uint8_t speed1, uint16_t speed2) {
 //rotaciona o robo.
 void set_rotation ( uint16_t rotation ) {
   
-
+/*
   uint16_t speed = 0 ;
   uint16_t deg   = (rotation & 0x3FF)%360;
   uint16_t tks   = (deg * 10) / 75;          // Furos do motor que serão contados (7,5° por furo)
 
   // Ajusta ângulo para múltiplo de 7,5°
   deg = (tks * 75) / 10;
+*/
+
+  // andar todos os 24 furos é o mesmo que virar em 180º, então:
+  int andar = WHEEL_TICKS*rotation/180;
+
+  count_enc_b = 0;
+  count_enc_a = 0;
+
 
   //Gira para a esquerda.
   if (msg.conf.pad != 0){
@@ -492,9 +500,12 @@ void set_rotation ( uint16_t rotation ) {
     digitalWrite(MTR_AIN1, 1);
     digitalWrite(MTR_AIN2, 0);     
     motor.config.dir_motor_B = 0b00;
-      set_speed(100, 0);
-    while ( count_enc_a < tks){
-      attachInterrupt(0, encoderA, RISING);  
+    motor.config.dir_motor_A = 0b01;
+    set_speed(50, 50);
+//    Serial.println("Enc A:");
+    while ( count_enc_a < andar){
+      attachInterrupt(2, encoderA, RISING);
+      Serial.println(count_enc_a);  
     }   
   //Gira para a direita.
   } else{
@@ -505,18 +516,25 @@ void set_rotation ( uint16_t rotation ) {
     digitalWrite(MTR_BIN1, 1);
     digitalWrite(MTR_BIN2, 0);    
     motor.config.dir_motor_A = 0b00;
-      set_speed(100, 0);
-    while ( count_enc_b < tks){
-      attachInterrupt(0, encoderB, RISING);  
+    motor.config.dir_motor_B = 0b01;
+    set_speed(50, 50);
+    Serial.println("Enc B:");
+    while ( count_enc_b < andar){
+      attachInterrupt(3, encoderB, RISING);  
+      Serial.println(count_enc_b);  
     }
-  } 
-
+  }
+//  Serial.println("Fim mensagem R"); 
+  count_enc_b = 0;
+  count_enc_a = 0;
     is_rotating = 0;
     digitalWrite(MTR_AIN1, 0);
     digitalWrite(MTR_AIN2, 0);    
     digitalWrite(MTR_BIN1, 0);
     digitalWrite(MTR_BIN2, 0);
-    delay(1000000); 
+    motor.config.dir_motor_B = 0b00;
+    motor.config.dir_motor_A = 0b00;
+    delay(1000); 
 }
 void     read_message           ( TRadioMsg ); 
 
@@ -581,14 +599,27 @@ void messageM (uint8_t pad, uint8_t dist, uint8_t speed) {
 void messageS (uint8_t pad, uint16_t speed) {
 
   // Caso o pad seja para a "velocidade negativa", inverte a ponte H.
-  if (pad == 0b1111) {
-      digitalWrite(MTR_AIN1, !bitRead(motor.config.dir_motor_A, 1));
-      digitalWrite(MTR_AIN2, !bitRead(motor.config.dir_motor_A, 0));
-      digitalWrite(MTR_BIN1, !bitRead(motor.config.dir_motor_B, 0));
-      digitalWrite(MTR_BIN2, !bitRead(motor.config.dir_motor_B, 1));
+  if (msg.conf.pad != 0) {
+      digitalWrite(MTR_AIN1, 1);
+      digitalWrite(MTR_AIN2, 0);
+      digitalWrite(MTR_BIN1, 1);
+      digitalWrite(MTR_BIN2, 0);
+      motor.config.dir_motor_A = 0b01;
+      motor.config.dir_motor_B = 0b01;
   }
-
-  set_speed(0, speed);
+  else{
+      digitalWrite(MTR_AIN1, 0);
+      digitalWrite(MTR_AIN2, 1);
+      digitalWrite(MTR_BIN1, 0);
+      digitalWrite(MTR_BIN2, 1);
+      motor.config.dir_motor_A = 0b10;
+      motor.config.dir_motor_B = 0b10;
+  }
+  
+  int new_speed;
+  // basta fazer que a vel. máx. equivale a 50cm/s
+  new_speed = 159*speed/50;
+  set_speed(0, new_speed);
 
   oldMsg = msg;
 }
